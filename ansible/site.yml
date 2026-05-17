@@ -1,0 +1,37 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Ansible Main Playbook: SRE Infrastructure Setup
+# Run: ansible-playbook -i inventory.ini site.yml
+# ─────────────────────────────────────────────────────────────
+
+- name: Setup SRE Infrastructure
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    app_name: sre-app
+    project_dir: /opt/sre-app
+    docker_compose_version: "2.24.0"
+
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+  roles:
+    - docker
+    - monitoring
+
+  post_tasks:
+    - name: Verify Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Print setup summary
+      debug:
+        msg: "✅ SRE infrastructure setup complete on {{ inventory_hostname }}"

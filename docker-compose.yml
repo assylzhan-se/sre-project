@@ -1,0 +1,193 @@
+version: '3.8'
+
+services:
+  # ─── Frontend ─────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - auth
+      - product
+      - order
+      - payment
+      - notification
+      - user-profile
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ─── Microservices ────────────────────────────────────────
+  auth:
+    build: ./services/auth
+    ports:
+      - "5001:5001"
+    environment:
+      - SERVICE_NAME=auth
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  product:
+    build: ./services/product
+    ports:
+      - "5002:5002"
+    environment:
+      - SERVICE_NAME=product
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  order:
+    build: ./services/order
+    ports:
+      - "5003:5003"
+    environment:
+      - SERVICE_NAME=order
+      - DB_HOST=postgres
+      - DB_BROKEN=false   # Set to 'true' to simulate incident
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  payment:
+    build: ./services/payment
+    ports:
+      - "5004:5004"
+    environment:
+      - SERVICE_NAME=payment
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  notification:
+    build: ./services/notification
+    ports:
+      - "5005:5005"
+    environment:
+      - SERVICE_NAME=notification
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  user-profile:
+    build: ./services/user-profile
+    ports:
+      - "5006:5006"
+    environment:
+      - SERVICE_NAME=user-profile
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Database ─────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: sre_user
+      POSTGRES_PASSWORD: sre_pass
+      POSTGRES_DB: sre_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sre_user"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ─── Cache ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ─── Monitoring ───────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ─── Node Exporter (host metrics) ─────────────────────────
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  app-network:
+    driver: bridge

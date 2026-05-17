@@ -1,0 +1,389 @@
+# ─────────────────────────────────────────────────────────────
+# Kubernetes Manifests for SRE Microservices
+# Apply with: kubectl apply -f kubernetes/
+# ─────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sre-app
+
+---
+# ─── Auth Service ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: sre-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+        - name: auth
+          image: sre-auth:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5001
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  namespace: sre-app
+spec:
+  selector:
+    app: auth
+  ports:
+    - port: 5001
+      targetPort: 5001
+  type: ClusterIP
+
+---
+# ─── Product Service ──────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product
+  namespace: sre-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product
+  template:
+    metadata:
+      labels:
+        app: product
+    spec:
+      containers:
+        - name: product
+          image: sre-product:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5002
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5002
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product
+  namespace: sre-app
+spec:
+  selector:
+    app: product
+  ports:
+    - port: 5002
+      targetPort: 5002
+
+---
+# ─── Order Service ────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order
+  namespace: sre-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order
+  template:
+    metadata:
+      labels:
+        app: order
+    spec:
+      containers:
+        - name: order
+          image: sre-order:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5003
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_HOST
+            - name: DB_BROKEN
+              value: "false"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5003
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "200m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order
+  namespace: sre-app
+spec:
+  selector:
+    app: order
+  ports:
+    - port: 5003
+      targetPort: 5003
+
+---
+# ─── Payment Service ──────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  namespace: sre-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: payment
+  template:
+    metadata:
+      labels:
+        app: payment
+    spec:
+      containers:
+        - name: payment
+          image: sre-payment:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5004
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5004
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "200m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment
+  namespace: sre-app
+spec:
+  selector:
+    app: payment
+  ports:
+    - port: 5004
+      targetPort: 5004
+
+---
+# ─── Notification Service ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification
+  namespace: sre-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification
+  template:
+    metadata:
+      labels:
+        app: notification
+    spec:
+      containers:
+        - name: notification
+          image: sre-notification:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5005
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5005
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification
+  namespace: sre-app
+spec:
+  selector:
+    app: notification
+  ports:
+    - port: 5005
+      targetPort: 5005
+
+---
+# ─── User Profile Service ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-profile
+  namespace: sre-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user-profile
+  template:
+    metadata:
+      labels:
+        app: user-profile
+    spec:
+      containers:
+        - name: user-profile
+          image: sre-user-profile:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5006
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5006
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-profile
+  namespace: sre-app
+spec:
+  selector:
+    app: user-profile
+  ports:
+    - port: 5006
+      targetPort: 5006
+
+---
+# ─── ConfigMap ────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: sre-app
+data:
+  DB_HOST: "postgres"
+  REDIS_HOST: "redis"
+
+---
+# ─── HorizontalPodAutoscaler (Order) ─────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-hpa
+  namespace: sre-app
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: order
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+# ─── Frontend (Nginx) ─────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: sre-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: sre-frontend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: sre-app
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+  type: NodePort

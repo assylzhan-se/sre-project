@@ -1,0 +1,80 @@
+{
+  "title": "SRE Microservices Overview",
+  "uid": "sre-overview",
+  "version": 1,
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Service Availability (Up/Down)",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "up",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "steps": [
+            {"color": "red", "value": 0},
+            {"color": "green", "value": 1}
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Request Rate per Service",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {"expr": "rate(auth_requests_total[5m])", "legendFormat": "Auth"},
+        {"expr": "rate(product_requests_total[5m])", "legendFormat": "Product"},
+        {"expr": "rate(order_requests_total[5m])", "legendFormat": "Order"},
+        {"expr": "rate(payment_requests_total[5m])", "legendFormat": "Payment"},
+        {"expr": "rate(notification_requests_total[5m])", "legendFormat": "Notification"},
+        {"expr": "rate(userprofile_requests_total[5m])", "legendFormat": "UserProfile"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "P95 Latency per Service (ms)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, rate(order_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "Order P95"},
+        {"expr": "histogram_quantile(0.95, rate(auth_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "Auth P95"},
+        {"expr": "histogram_quantile(0.95, rate(product_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "Product P95"}
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Error Rate (5xx)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {
+          "expr": "rate(order_requests_total{status=~\"5..\"}[5m]) / rate(order_requests_total[5m])",
+          "legendFormat": "Order Error Rate"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "CPU Usage %",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance)(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "CPU %"
+        }
+      ]
+    }
+  ],
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "30s"
+}

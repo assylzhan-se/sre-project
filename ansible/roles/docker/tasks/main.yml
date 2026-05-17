@@ -1,0 +1,69 @@
+---
+# ─── Role: docker ─────────────────────────────────────────────
+
+- name: Install required packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - git
+      - python3-pip
+    state: present
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Docker CE
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: Start and enable Docker
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Install Python Docker SDK
+  pip:
+    name:
+      - docker
+      - docker-compose
+    state: present
+
+- name: Create project directory
+  file:
+    path: /opt/sre-app
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+
+- name: Copy docker-compose.yml to server
+  copy:
+    src: "{{ playbook_dir }}/../docker-compose.yml"
+    dest: /opt/sre-app/docker-compose.yml
+    owner: ubuntu
+    group: ubuntu
+    mode: '0644'

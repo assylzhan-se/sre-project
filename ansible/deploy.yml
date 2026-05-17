@@ -1,0 +1,64 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Ansible Deploy Playbook: Deploy/Update SRE Application
+# Run: ansible-playbook -i inventory.ini deploy.yml
+# ─────────────────────────────────────────────────────────────
+
+- name: Deploy SRE Microservices Application
+  hosts: managers
+  become: yes
+
+  vars:
+    project_dir: /opt/sre-app
+
+  tasks:
+    - name: Pull latest code (if using git)
+      # Uncomment when git repo is set up:
+      # git:
+      #   repo: "https://github.com/YOUR_USERNAME/sre-project.git"
+      #   dest: "{{ project_dir }}"
+      #   version: main
+      debug:
+        msg: "Skipping git pull (local deployment)"
+
+    - name: Copy project files to server
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ project_dir }}/"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=__pycache__"
+      ignore_errors: yes
+
+    - name: Build Docker images
+      command: docker compose build
+      args:
+        chdir: "{{ project_dir }}"
+
+    - name: Start application stack
+      command: docker compose up -d
+      args:
+        chdir: "{{ project_dir }}"
+
+    - name: Wait for services to start
+      pause:
+        seconds: 15
+
+    - name: Check service health
+      uri:
+        url: "http://localhost:{{ item.port }}/health"
+        return_content: yes
+      register: health_check
+      loop:
+        - {name: auth, port: 5001}
+        - {name: product, port: 5002}
+        - {name: order, port: 5003}
+        - {name: payment, port: 5004}
+        - {name: notification, port: 5005}
+        - {name: user-profile, port: 5006}
+      ignore_errors: yes
+
+    - name: Print health check results
+      debug:
+        msg: "{{ item.item.name }}: {{ item.status | default('UNREACHABLE') }}"
+      loop: "{{ health_check.results }}"

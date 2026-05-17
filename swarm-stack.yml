@@ -1,0 +1,155 @@
+version: '3.8'
+# ─────────────────────────────────────────────────────────────
+# Docker Swarm Stack Configuration
+# Deploy: docker swarm init && docker stack deploy -c swarm-stack.yml sre
+# ─────────────────────────────────────────────────────────────
+
+services:
+  frontend:
+    image: sre-frontend:latest
+    ports:
+      - "80:80"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    networks:
+      - app-network
+
+  auth:
+    image: sre-auth:latest
+    ports:
+      - "5001:5001"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+    networks:
+      - app-network
+
+  product:
+    image: sre-product:latest
+    ports:
+      - "5002:5002"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-network
+
+  order:
+    image: sre-order:latest
+    ports:
+      - "5003:5003"
+    environment:
+      - DB_HOST=postgres
+      - DB_BROKEN=false
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - app-network
+
+  payment:
+    image: sre-payment:latest
+    ports:
+      - "5004:5004"
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - app-network
+
+  notification:
+    image: sre-notification:latest
+    ports:
+      - "5005:5005"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-network
+
+  user-profile:
+    image: sre-user-profile:latest
+    ports:
+      - "5006:5006"
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: sre_user
+      POSTGRES_PASSWORD: sre_pass
+      POSTGRES_DB: sre_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - app-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - app-network
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+    deploy:
+      replicas: 1
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  app-network:
+    driver: overlay

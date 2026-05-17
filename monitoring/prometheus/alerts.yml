@@ -1,0 +1,70 @@
+groups:
+  - name: sre-alerts
+    rules:
+
+      # ── Availability SLO ─────────────────────────────────
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is DOWN"
+          description: "Service {{ $labels.job }} has been unreachable for more than 1 minute."
+
+      # ── Latency SLO: ≤ 200ms ─────────────────────────────
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(order_request_duration_seconds_bucket[5m])
+          ) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on Order Service"
+          description: "P95 latency exceeds 200ms SLO target."
+
+      # ── Error Rate SLO: ≤ 1% ─────────────────────────────
+      - alert: HighErrorRate
+        expr: |
+          rate(order_requests_total{status=~"5.."}[5m]) /
+          rate(order_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order Service error rate exceeds 1% SLO"
+          description: "Error rate is {{ $value | humanizePercentage }}."
+
+      # ── Order Service 503 (Incident Simulation) ──────────
+      - alert: OrderServiceUnavailable
+        expr: rate(order_requests_total{status="503"}[5m]) > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order Service returning 503"
+          description: "DB connection failure detected in Order Service."
+
+      # ── High CPU ─────────────────────────────────────────
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance)(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80%."
+
+      # ── High Memory ──────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) /
+          node_memory_MemTotal_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 85%."
